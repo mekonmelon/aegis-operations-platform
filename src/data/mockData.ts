@@ -1,0 +1,25 @@
+import type { DashboardData } from '../types/domain'
+
+export const mockDashboardData: DashboardData = {
+  lastUpdated: '2026-08-17T14:32:00Z',
+  incidents: [
+    { id: 'INC-2048', title: 'River District Flooding', kind: 'flood', severity: 'critical', location: 'North River District', status: 'Escalating', reportedAt: '2026-08-17T14:18:00Z', coordinates: { x: 31, y: 30 } },
+    { id: 'INC-2047', title: 'Ridge Wildfire', kind: 'wildfire', severity: 'high', location: 'West Ridge Preserve', status: 'Response active', reportedAt: '2026-08-17T13:46:00Z', coordinates: { x: 18, y: 66 } },
+    { id: 'INC-2046', title: 'Grid Power Outage', kind: 'outage', severity: 'moderate', location: 'Eastgate Sector 4', status: 'Monitoring', reportedAt: '2026-08-17T12:57:00Z', coordinates: { x: 76, y: 41 } },
+    { id: 'INC-2043', title: 'Highway 8 Closure', kind: 'road', severity: 'low', location: 'South Junction', status: 'Contained', reportedAt: '2026-08-17T11:21:00Z', coordinates: { x: 57, y: 77 } },
+  ],
+  resources: [
+    { id: 'RES-1', kind: 'teams', label: 'Response Teams', available: 14, total: 20, unit: 'teams' },
+    { id: 'RES-2', kind: 'vehicles', label: 'Response Vehicles', available: 31, total: 42, unit: 'units' },
+    { id: 'RES-3', kind: 'medical', label: 'Medical Capacity', available: 186, total: 240, unit: 'beds' },
+    { id: 'RES-4', kind: 'supplies', label: 'Emergency Supplies', available: 78, total: 100, unit: '%' },
+  ],
+  facilities: [
+    { id: 'FAC-1', name: 'Mercy General', kind: 'hospital', status: 'operational', coordinates: { x: 62, y: 25 } },
+    { id: 'FAC-2', name: 'Northside Clinic', kind: 'hospital', status: 'at-risk', coordinates: { x: 42, y: 36 } },
+    { id: 'FAC-3', name: 'Central Civic Shelter', kind: 'shelter', status: 'operational', coordinates: { x: 49, y: 56 } },
+    { id: 'FAC-4', name: 'East High Shelter', kind: 'shelter', status: 'operational', coordinates: { x: 81, y: 59 } },
+    { id: 'FAC-5', name: 'Logistics Depot 3', kind: 'depot', status: 'at-risk', coordinates: { x: 27, y: 75 } },
+  ],
+  recommendations: [{ id: 'REC-1', priority: 'critical', title: 'Deploy Team Alpha-3', detail: 'Deploy swift-water rescue team Alpha-3 to North River District. Rising water levels may isolate 340 residents within 45 minutes.', actionLabel: 'Review deployment', incidentId: 'INC-2048' }],
+}
