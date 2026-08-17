@@ -1,6 +1,6 @@
 # Aegis
 
-Aegis is a frontend prototype for a real-time crisis operations platform. It presents a polished, offline-capable command-center dashboard using local mock data only—there is no backend, authentication, database, or external map/API integration.
+Aegis is a frontend prototype for a real-time crisis operations platform.
 
 ## Run locally
 
