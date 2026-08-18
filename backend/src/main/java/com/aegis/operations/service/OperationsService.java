@@ -12,16 +12,17 @@ import com.aegis.operations.model.Recommendation;
 import com.aegis.operations.model.RecommendationStatus;
 import com.aegis.operations.model.Resource;
 import com.aegis.operations.model.Severity;
-import com.aegis.operations.store.InMemoryOperationsStore;
+import com.aegis.operations.store.IncidentSearchCriteria;
+import com.aegis.operations.store.OperationsStore;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 @Service
 public class OperationsService {
-    private final InMemoryOperationsStore store;
+    private final OperationsStore store;
 
-    public OperationsService(InMemoryOperationsStore store) {
+    public OperationsService(OperationsStore store) {
         this.store = store;
     }
 
@@ -30,19 +31,11 @@ public class OperationsService {
     }
 
     public List<Incident> listIncidents(String search, String severity, String kind, String status) {
-        String normalizedSearch = StringUtils.hasText(search) ? search.trim().toLowerCase() : null;
         Severity severityFilter = parseOptional(Severity.class, severity, "severity");
         IncidentKind kindFilter = parseOptional(IncidentKind.class, kind, "kind");
         IncidentStatus statusFilter = parseOptional(IncidentStatus.class, status, "status");
 
-        return store.incidentSnapshots().stream()
-                .filter(incident -> normalizedSearch == null
-                        || incident.getTitle().toLowerCase().contains(normalizedSearch)
-                        || incident.getLocation().toLowerCase().contains(normalizedSearch))
-                .filter(incident -> severityFilter == null || incident.getSeverity() == severityFilter)
-                .filter(incident -> kindFilter == null || incident.getKind() == kindFilter)
-                .filter(incident -> statusFilter == null || incident.getStatus() == statusFilter)
-                .toList();
+        return store.searchIncidents(new IncidentSearchCriteria(search, severityFilter, kindFilter, statusFilter));
     }
 
     public Incident getIncident(String incidentId) {
@@ -73,10 +66,10 @@ public class OperationsService {
         Recommendation recommendation = findRecommendation(recommendationId);
         ensurePending(recommendation);
 
-        Incident incident = store.incidentReference(recommendation.getIncidentId())
+        Incident incident = store.incidentSnapshot(recommendation.getIncidentId())
                 .orElseThrow(() -> new NotFoundException("INCIDENT_NOT_FOUND",
                         "Incident " + recommendation.getIncidentId() + " was not found."));
-        Resource resource = store.resourceReference(recommendation.getResourceId())
+        Resource resource = store.resourceSnapshot(recommendation.getResourceId())
                 .orElseThrow(() -> new NotFoundException("RESOURCE_NOT_FOUND",
                         "Resource " + recommendation.getResourceId() + " was not found."));
 
@@ -95,7 +88,10 @@ public class OperationsService {
             incident.setStatus(IncidentStatus.RESPONSE_ACTIVE);
         }
 
-        store.touch();
+        store.saveRecommendation(recommendation);
+        store.saveIncident(incident);
+        store.saveResource(resource);
+        store.updateLastUpdated();
         return store.dashboardSnapshot();
     }
 
@@ -105,13 +101,14 @@ public class OperationsService {
 
         recommendation.setStatus(RecommendationStatus.DISMISSED);
         recommendation.setStatusMessage("Recommendation dismissed for this demo session.");
-        store.touch();
+        store.saveRecommendation(recommendation);
+        store.updateLastUpdated();
 
         return store.dashboardSnapshot();
     }
 
     private Recommendation findRecommendation(String recommendationId) {
-        return store.recommendationReference(recommendationId)
+        return store.recommendationSnapshot(recommendationId)
                 .orElseThrow(() -> new NotFoundException("RECOMMENDATION_NOT_FOUND",
                         "Recommendation " + recommendationId + " was not found."));
     }

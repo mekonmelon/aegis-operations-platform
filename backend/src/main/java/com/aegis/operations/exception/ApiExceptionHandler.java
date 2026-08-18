@@ -3,6 +3,7 @@ package com.aegis.operations.exception;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.dao.DataAccessException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -23,6 +24,12 @@ public class ApiExceptionHandler {
     @ExceptionHandler(BadRequestException.class)
     public ResponseEntity<ApiErrorResponse> handleBadRequest(BadRequestException exception) {
         return error(HttpStatus.BAD_REQUEST, exception.code(), exception.getMessage());
+    }
+
+    @ExceptionHandler(DataAccessException.class)
+    public ResponseEntity<ApiErrorResponse> handleStorageUnavailable(DataAccessException exception) {
+        return error(HttpStatus.SERVICE_UNAVAILABLE, "STORAGE_UNAVAILABLE",
+                "Operations storage is unavailable.");
     }
 
     @ExceptionHandler({

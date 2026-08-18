@@ -16,7 +16,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
+@SpringBootTest(properties = "aegis.storage=memory")
 @AutoConfigureMockMvc
 class OperationsApiTest {
     @Autowired
@@ -27,7 +27,7 @@ class OperationsApiTest {
 
     @BeforeEach
     void resetStore() {
-        store.reset();
+        store.resetWithDemoData();
     }
 
     @Test
@@ -58,6 +58,22 @@ class OperationsApiTest {
         mockMvc.perform(get("/api/incidents/INC-9999"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error.code").value("INCIDENT_NOT_FOUND"));
+    }
+
+    @Test
+    void incidentTextSearchMatchesTitleLocationAndDescription() throws Exception {
+        mockMvc.perform(get("/api/incidents?search=generator"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.incidents", hasSize(1)))
+                .andExpect(jsonPath("$.incidents[0].id").value("INC-2046"));
+    }
+
+    @Test
+    void incidentFiltersCombineWithAnd() throws Exception {
+        mockMvc.perform(get("/api/incidents?search=river&severity=critical&kind=flood"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.incidents", hasSize(1)))
+                .andExpect(jsonPath("$.incidents[0].id").value("INC-2048"));
     }
 
     @Test

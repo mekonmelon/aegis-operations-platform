@@ -22,7 +22,7 @@ Recommendation: implement both, but make `GET /api/dashboard` the primary contra
 
 Current TypeScript domain types:
 - `Severity`: `critical | high | moderate | low`
-- `IncidentStatus`: `Escalating | Response active | Monitoring | Contained`
+- `IncidentStatus`: API values are `escalating | response_active | monitoring | contained`; the current frontend maps these to display labels.
 - `IncidentKind`: `flood | wildfire | outage | road`
 - `RecommendationStatus`: `pending | approved | dismissed`
 - `Coordinates`: `{ x: number; y: number }`
@@ -104,7 +104,7 @@ Optional query parameters:
 - `search`: text search over title and location
 - `severity`: `critical | high | moderate | low`
 - `kind`: `flood | wildfire | outage | road`
-- `status`: `Escalating | Response active | Monitoring | Contained`
+- `status`: `escalating | response_active | monitoring | contained`
 
 Request body: none
 
@@ -140,7 +140,7 @@ Response body:
   "kind": "flood",
   "severity": "critical",
   "location": "North River District",
-  "status": "Escalating",
+  "status": "escalating",
   "reportedAt": "2026-08-17T14:18:00Z",
   "coordinates": { "x": 31, "y": 30 },
   "description": "Rapid river rise is flooding low-lying residential blocks and threatening access to the north evacuation route.",
@@ -312,7 +312,7 @@ Likely status codes:
   "kind": "flood",
   "severity": "critical",
   "location": "North River District",
-  "status": "Escalating",
+  "status": "escalating",
   "reportedAt": "2026-08-17T14:18:00Z",
   "coordinates": {
     "x": 31,
@@ -380,7 +380,7 @@ Likely status codes:
       "kind": "flood",
       "severity": "critical",
       "location": "North River District",
-      "status": "Response active",
+      "status": "response_active",
       "reportedAt": "2026-08-17T14:18:00Z",
       "coordinates": { "x": 31, "y": 30 },
       "description": "Rapid river rise is flooding low-lying residential blocks and threatening access to the north evacuation route.",
@@ -439,7 +439,7 @@ Types that should remain frontend-only:
 
 Recommended future type changes:
 - Split API response DTOs from UI/domain view models once the Java API is implemented. For now, direct mapping is acceptable because the UI is small.
-- Consider changing `IncidentStatus` API values to stable enum-style strings such as `escalating`, `response_active`, `monitoring`, and `contained`. The current values are display labels, which are convenient for the UI but less ideal as backend enum values.
+- Keep API `IncidentStatus` values as stable enum-style strings such as `escalating`, `response_active`, `monitoring`, and `contained`; map them to UI display labels in the frontend API data-source layer.
 - Consider changing facility status from inline string literals to a named `FacilityStatus` type.
 - Consider replacing map placeholder `Coordinates` with a named `MapPoint` or `RegionCoordinates` type while this remains an offline schematic map. Do not use latitude/longitude names until the product actually integrates a real map service.
 - Keep `affectedFacilityIds` and `assignedResourceIds` as id arrays for now. They make the aggregate dashboard compact and avoid duplicating facility/resource objects inside each incident.

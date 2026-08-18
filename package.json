@@ -11,11 +11,12 @@
   },
   "dependencies": {
     "@vitejs/plugin-react": "^4.3.4",
-    "vite": "^5.4.19",
-    "typescript": "^5.9.2",
+    "docker": "^1.0.0",
+    "lucide-react": "latest",
     "react": "latest",
     "react-dom": "latest",
-    "lucide-react": "latest"
+    "typescript": "^5.9.2",
+    "vite": "^5.4.19"
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
