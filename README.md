@@ -127,6 +127,112 @@ aegis.storage=memory
 
 Elasticsearch integration tests use Testcontainers and are skipped automatically when Docker is unavailable.
 
+## Ingest National Weather Service alerts
+
+The backend can import active National Weather Service alerts into the incident index. This is still a simple development feature: no Spark, Kafka, database, authentication, or extra services are required.
+
+By default, automatic NWS ingestion is disabled. Trigger a one-time refresh manually:
+
+```bash
+curl -X POST http://localhost:8080/api/ingestion/nws/refresh
+```
+
+Check the latest ingestion status:
+
+```bash
+curl http://localhost:8080/api/ingestion/nws/status
+```
+
+Configure areas and User-Agent:
+
+```bash
+AEGIS_NWS_AREAS=NJ,NY,PA
+AEGIS_NWS_USER_AGENT="Aegis Crisis Operations Prototype"
+```
+
+Spring properties are also available:
+
+```text
+aegis.ingestion.nws.enabled=false
+aegis.ingestion.nws.scheduled-enabled=false
+aegis.ingestion.nws.areas=NJ,NY,PA
+aegis.ingestion.nws.refresh-interval=5m
+```
+
+Set `aegis.ingestion.nws.enabled=true` to refresh once after backend startup. Set `aegis.ingestion.nws.scheduled-enabled=true` to refresh on a schedule. The refresh interval is clamped to a minimum of 30 seconds.
+
+Imported NWS alerts become incidents with `source=nws`, deterministic `NWS-...` IDs, original NWS identity in `sourceId`, source timestamps, and `coordinates=null`. The schematic frontend map skips incidents without placeholder x/y coordinates, but they still appear in the incident list, filters, search, and details.
+
+## Ingest OpenFEMA disaster declarations
+
+Aegis also imports official FEMA disaster declarations from OpenFEMA:
+
+```text
+https://www.fema.gov/api/open/v1/DisasterDeclarationsSummaries
+```
+
+FEMA declarations are not incidents. NWS represents operational alerts; FEMA represents official declarations that may cover many counties and a broader incident period. Aegis stores them in a separate Elasticsearch index:
+
+```text
+aegis-disaster-declarations
+aegis-incident-declaration-links
+```
+
+Trigger a FEMA refresh:
+
+```bash
+curl -X POST http://localhost:8080/api/ingestion/fema/refresh
+```
+
+Check FEMA ingestion status:
+
+```bash
+curl http://localhost:8080/api/ingestion/fema/status
+```
+
+Query declarations:
+
+```bash
+curl 'http://localhost:8080/api/declarations?state=NJ'
+curl 'http://localhost:8080/api/declarations?incidentType=Flood'
+curl 'http://localhost:8080/api/declarations?search=storm'
+curl http://localhost:8080/api/declarations/FEMA-4926
+```
+
+Find correlated declarations for an incident:
+
+```bash
+curl http://localhost:8080/api/incidents/NWS_EXAMPLE_ID/declarations
+```
+
+Configure FEMA scope:
+
+```bash
+AEGIS_FEMA_STATES=NJ,NY,PA
+```
+
+Spring properties:
+
+```text
+aegis.ingestion.fema.base-url=https://www.fema.gov/api/open/v1
+aegis.ingestion.fema.states=NJ,NY,PA
+aegis.ingestion.fema.recent-window=730d
+```
+
+OpenFEMA may return multiple county records for one disaster number. Aegis groups those records into one `DisasterDeclaration`, with counties collected in `declaredAreas`, and deduplicates by deterministic IDs such as `FEMA-4926`.
+
+Correlation is simple and explainable, not AI-based:
+
+```text
+same state: +0.40
+compatible hazard: +0.35
+overlapping or nearby incident period: +0.20
+overlapping area text: +0.05
+minimum confidence: 0.70
+```
+
+Only links at or above the threshold are exposed. This is intentionally conservative and designed as a future Spark-friendly batch/stream correlation seam, not a final entity-resolution system.
+
 Run the full backend build:
 
 ```bash
@@ -142,6 +248,7 @@ backend/
 │   ├── config/             Minimal development CORS configuration
 │   ├── controller/         REST controllers for the API contract
 │   ├── exception/          Centralized API error handling
+│   ├── integration/        NWS and FEMA clients, DTOs, mappers, ingestion sync
 │   ├── model/              Java domain models and enums
 │   ├── service/            Dashboard reads and recommendation transitions
 │   └── store/              Storage abstraction, memory store, Elasticsearch store
@@ -178,8 +285,9 @@ Incident search is backed by Elasticsearch for:
 curl 'http://localhost:8080/api/incidents?search=river'
 curl 'http://localhost:8080/api/incidents?severity=critical'
 curl 'http://localhost:8080/api/incidents?search=river&severity=critical&kind=flood'
+curl 'http://localhost:8080/api/incidents?source=nws'
 ```
 
-The `search` query matches incident `title`, `location`, and `description` text fields. Enum filters such as `severity`, `kind`, and `status` are exact keyword filters, and supplied filters combine with logical AND.
+The `search` query matches incident `title`, `location`, and `description` text fields. Enum filters such as `severity`, `kind`, `status`, and `source` are exact keyword filters, and supplied filters combine with logical AND.
 
 Recommendation approval updates several Elasticsearch documents: recommendation status, incident assignment/status, resource availability, and dashboard `lastUpdated`. Elasticsearch does not provide relational multi-document transactions, so this portfolio implementation keeps the sequence simple and documents that a failure halfway through could leave partial updates. A future production version would need stronger consistency controls.

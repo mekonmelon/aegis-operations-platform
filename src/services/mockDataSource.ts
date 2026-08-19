@@ -9,6 +9,10 @@ export class MockOperationsDataSource implements OperationsDataSource {
     return Promise.resolve(this.snapshot())
   }
 
+  async getRelatedDeclarations() {
+    return Promise.resolve([])
+  }
+
   async approveRecommendation(recommendationId: string) {
     const recommendation = this.data.recommendations.find(item => item.id === recommendationId)
 

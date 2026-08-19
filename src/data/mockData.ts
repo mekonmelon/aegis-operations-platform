@@ -15,6 +15,10 @@ export const mockDashboardData: DashboardData = {
       description: 'Rapid river rise is flooding low-lying residential blocks and threatening access to the north evacuation route.',
       affectedFacilityIds: ['FAC-2'],
       assignedResourceIds: [],
+      source: 'demo',
+      sourceId: 'INC-2048',
+      sourceUpdatedAt: '2026-08-17T14:18:00Z',
+      ingestedAt: '2026-08-17T14:18:00Z',
     },
     {
       id: 'INC-2047',
@@ -28,6 +32,10 @@ export const mockDashboardData: DashboardData = {
       description: 'Wind-driven fire is moving along the preserve boundary with smoke exposure reported near two neighborhoods.',
       affectedFacilityIds: ['FAC-5'],
       assignedResourceIds: ['RES-2'],
+      source: 'demo',
+      sourceId: 'INC-2047',
+      sourceUpdatedAt: '2026-08-17T13:46:00Z',
+      ingestedAt: '2026-08-17T13:46:00Z',
     },
     {
       id: 'INC-2046',
@@ -41,6 +49,10 @@ export const mockDashboardData: DashboardData = {
       description: 'Substation fault has interrupted commercial power across Eastgate with backup generators holding at critical facilities.',
       affectedFacilityIds: ['FAC-4'],
       assignedResourceIds: [],
+      source: 'demo',
+      sourceId: 'INC-2046',
+      sourceUpdatedAt: '2026-08-17T12:57:00Z',
+      ingestedAt: '2026-08-17T12:57:00Z',
     },
     {
       id: 'INC-2043',
@@ -54,6 +66,10 @@ export const mockDashboardData: DashboardData = {
       description: 'Flood debris and a disabled utility vehicle have closed two lanes while public works clears the corridor.',
       affectedFacilityIds: [],
       assignedResourceIds: [],
+      source: 'demo',
+      sourceId: 'INC-2043',
+      sourceUpdatedAt: '2026-08-17T11:21:00Z',
+      ingestedAt: '2026-08-17T11:21:00Z',
     },
   ],
   resources: [

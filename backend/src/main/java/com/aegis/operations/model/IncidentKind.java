@@ -7,7 +7,8 @@ public enum IncidentKind implements JsonEnum {
     FLOOD("flood"),
     WILDFIRE("wildfire"),
     OUTAGE("outage"),
-    ROAD("road");
+    ROAD("road"),
+    WEATHER("weather");
 
     private final String jsonValue;
 

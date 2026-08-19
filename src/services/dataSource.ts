@@ -1,7 +1,8 @@
-import type { DashboardData } from '../types/domain'
+import type { DashboardData, IncidentDeclarationMatch } from '../types/domain'
 
 export interface OperationsDataSource {
   getDashboardData(): Promise<DashboardData>
+  getRelatedDeclarations(incidentId: string): Promise<IncidentDeclarationMatch[]>
   approveRecommendation(recommendationId: string): Promise<DashboardData>
   dismissRecommendation(recommendationId: string): Promise<DashboardData>
 }

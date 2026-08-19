@@ -3,6 +3,7 @@ import type {
   Facility,
   Incident,
   IncidentStatus,
+  IncidentDeclarationMatch,
   Recommendation,
   Resource,
 } from '../types/domain'
@@ -63,6 +64,19 @@ export class ApiOperationsDataSource implements OperationsDataSource {
     return this.requestDashboard(`/api/recommendations/${encodeURIComponent(recommendationId)}/dismiss`, {
       method: 'POST',
     })
+  }
+
+  async getRelatedDeclarations(incidentId: string) {
+    const response = await fetch(`${this.baseUrl}/api/incidents/${encodeURIComponent(incidentId)}/declarations`, {
+      headers: { Accept: 'application/json' },
+    })
+
+    if (!response.ok) {
+      throw await this.toApiError(response)
+    }
+
+    const payload = await response.json() as { declarations: IncidentDeclarationMatch[] }
+    return payload.declarations
   }
 
   private async requestDashboard(path: string, init?: RequestInit) {

@@ -1,6 +1,10 @@
 package com.aegis.operations.controller;
 
 import com.aegis.operations.store.InMemoryOperationsStore;
+import com.aegis.operations.model.DisasterDeclaration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,7 +43,8 @@ class OperationsApiTest {
                 .andExpect(jsonPath("$.resources", hasSize(4)))
                 .andExpect(jsonPath("$.facilities", hasSize(5)))
                 .andExpect(jsonPath("$.recommendations", hasSize(1)))
-                .andExpect(jsonPath("$.incidents[0].status").value("escalating"));
+                .andExpect(jsonPath("$.incidents[0].status").value("escalating"))
+                .andExpect(jsonPath("$.incidents[0].source").value("demo"));
     }
 
     @Test
@@ -74,6 +79,27 @@ class OperationsApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.incidents", hasSize(1)))
                 .andExpect(jsonPath("$.incidents[0].id").value("INC-2048"));
+    }
+
+    @Test
+    void incidentSourceFilterMatchesDemoIncidents() throws Exception {
+        mockMvc.perform(get("/api/incidents?source=demo"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.incidents", hasSize(4)));
+    }
+
+    @Test
+    void declarationFilteringAndSearchWorks() throws Exception {
+        store.saveDeclaration(new DisasterDeclaration("FEMA-4926", 4926, "DR", "NJ",
+                "Severe Storms and Flooding", "Flood", Instant.parse("2026-08-03T00:00:00Z"),
+                LocalDate.parse("2026-07-28"), LocalDate.parse("2026-08-02"), List.of("Camden County"), true, true,
+                false, "fema", "4926", Instant.parse("2026-08-03T00:00:00Z"),
+                Instant.parse("2026-08-18T04:00:00Z")));
+
+        mockMvc.perform(get("/api/declarations?state=NJ&search=storm"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.declarations", hasSize(1)))
+                .andExpect(jsonPath("$.declarations[0].id").value("FEMA-4926"));
     }
 
     @Test

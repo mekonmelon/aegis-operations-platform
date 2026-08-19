@@ -23,7 +23,8 @@ Recommendation: implement both, but make `GET /api/dashboard` the primary contra
 Current TypeScript domain types:
 - `Severity`: `critical | high | moderate | low`
 - `IncidentStatus`: API values are `escalating | response_active | monitoring | contained`; the current frontend maps these to display labels.
-- `IncidentKind`: `flood | wildfire | outage | road`
+- `IncidentKind`: `flood | wildfire | outage | road | weather`
+- `IncidentSource`: `demo | nws`
 - `RecommendationStatus`: `pending | approved | dismissed`
 - `Coordinates`: `{ x: number; y: number }`
 - `Incident`
@@ -64,6 +65,15 @@ Errors should use a simple JSON shape:
 }
 ```
 
+## Source Model
+
+Aegis keeps heterogeneous public sources in separate domain models:
+
+- NWS active alerts become `Incident` records because they describe operational, time-sensitive alerts.
+- OpenFEMA disaster declarations become `DisasterDeclaration` records because they are official declarations that may group many counties and cover a broader incident period.
+
+Relationships between those entities are represented by `IncidentDeclarationLink` records, not by merging FEMA data into incidents.
+
 ## Endpoints
 
 ### Get Dashboard
@@ -103,8 +113,9 @@ Purpose: Return incidents for the active operations period. Optional query param
 Optional query parameters:
 - `search`: text search over title and location
 - `severity`: `critical | high | moderate | low`
-- `kind`: `flood | wildfire | outage | road`
+- `kind`: `flood | wildfire | outage | road | weather`
 - `status`: `escalating | response_active | monitoring | contained`
+- `source`: `demo | nws`
 
 Request body: none
 
@@ -145,7 +156,12 @@ Response body:
   "coordinates": { "x": 31, "y": 30 },
   "description": "Rapid river rise is flooding low-lying residential blocks and threatening access to the north evacuation route.",
   "affectedFacilityIds": ["FAC-2"],
-  "assignedResourceIds": []
+  "assignedResourceIds": [],
+  "source": "demo",
+  "sourceId": "INC-2048",
+  "sourceUrl": null,
+  "sourceUpdatedAt": "2026-08-17T14:18:00Z",
+  "ingestedAt": "2026-08-17T14:18:00Z"
 }
 ```
 
@@ -301,6 +317,181 @@ Likely status codes:
 - `409 Conflict`: recommendation was already approved or dismissed by another operation
 - `500 Internal Server Error`: dismissal failed
 
+### Refresh NWS Alerts
+
+Method: `POST`
+
+URL: `/api/ingestion/nws/refresh`
+
+Purpose: Trigger a development/admin synchronization of active National Weather Service alerts for the configured areas. A successful sync upserts active NWS alerts as `Incident` records, removes stale NWS-sourced incidents that are no longer active, and does not modify `demo` incidents.
+
+Request body: none
+
+Response body:
+
+```json
+{
+  "source": "NWS",
+  "fetched": 25,
+  "created": 8,
+  "updated": 17,
+  "removed": 3,
+  "startedAt": "2026-08-17T15:02:11Z",
+  "completedAt": "2026-08-17T15:02:14Z",
+  "status": "success",
+  "error": null
+}
+```
+
+Likely status codes:
+- `200 OK`: refresh completed
+- `500 Internal Server Error`: NWS fetch or normalization failed; existing NWS incidents are preserved
+
+### Get NWS Ingestion Status
+
+Method: `GET`
+
+URL: `/api/ingestion/nws/status`
+
+Purpose: Return the latest simple ingestion status for the NWS data source.
+
+Request body: none
+
+Response body:
+
+```json
+{
+  "source": "NWS",
+  "enabled": false,
+  "scheduledEnabled": false,
+  "areas": ["NJ", "NY", "PA"],
+  "lastAttempt": "2026-08-17T15:02:11Z",
+  "lastSuccessfulSync": "2026-08-17T15:02:14Z",
+  "lastResult": {
+    "source": "NWS",
+    "fetched": 25,
+    "created": 8,
+    "updated": 17,
+    "removed": 3,
+    "startedAt": "2026-08-17T15:02:11Z",
+    "completedAt": "2026-08-17T15:02:14Z",
+    "status": "success",
+    "error": null
+  },
+  "lastError": null
+}
+```
+
+Likely status codes:
+- `200 OK`: status loaded
+- `500 Internal Server Error`: status could not be loaded
+
+### Refresh FEMA Declarations
+
+Method: `POST`
+
+URL: `/api/ingestion/fema/refresh`
+
+Purpose: Fetch recent OpenFEMA Disaster Declarations Summaries for configured states, group county records by disaster number, upsert `DisasterDeclaration` records, and rebuild explainable declaration links.
+
+Request body: none
+
+Response body:
+
+```json
+{
+  "source": "FEMA",
+  "fetchedRecords": 46,
+  "declarations": 8,
+  "created": 2,
+  "updated": 6,
+  "linksCreated": 4,
+  "startedAt": "2026-08-18T14:00:00Z",
+  "completedAt": "2026-08-18T14:00:02Z",
+  "status": "success",
+  "error": null
+}
+```
+
+Likely status codes:
+- `200 OK`: refresh completed
+- `500 Internal Server Error`: FEMA fetch or normalization failed; existing FEMA data and links are preserved
+
+### Get FEMA Ingestion Status
+
+Method: `GET`
+
+URL: `/api/ingestion/fema/status`
+
+Purpose: Return latest FEMA ingestion status.
+
+Likely status codes:
+- `200 OK`: status loaded
+- `500 Internal Server Error`: status could not be loaded
+
+### List Disaster Declarations
+
+Method: `GET`
+
+URL: `/api/declarations`
+
+Optional query parameters:
+- `search`: text search over title and declared areas
+- `state`: state code, such as `NJ`
+- `incidentType`: FEMA incident type, such as `Flood`
+- `declarationType`: FEMA declaration type, such as `DR`
+
+Response body:
+
+```json
+{
+  "declarations": []
+}
+```
+
+### Get Disaster Declaration
+
+Method: `GET`
+
+URL: `/api/declarations/{declarationId}`
+
+Response body: `DisasterDeclaration`
+
+Likely status codes:
+- `200 OK`: declaration found
+- `404 Not Found`: declaration does not exist
+
+### Get Incident Declaration Links
+
+Method: `GET`
+
+URL: `/api/incidents/{incidentId}/declarations`
+
+Purpose: Return plausible FEMA declaration relationships for an incident.
+
+Response body:
+
+```json
+{
+  "declarations": [
+    {
+      "incidentId": "NWS-673F0EA0A9E18E51",
+      "declaration": {},
+      "confidence": 0.95,
+      "reasons": ["same_state", "compatible_hazard", "overlapping_time_window"]
+    }
+  ]
+}
+```
+
+### Get Declaration Incident Links
+
+Method: `GET`
+
+URL: `/api/declarations/{declarationId}/incidents`
+
+Purpose: Return plausible incident relationships for a FEMA declaration.
+
 ## Example JSON Models
 
 ### Incident
@@ -320,7 +511,35 @@ Likely status codes:
   },
   "description": "Rapid river rise is flooding low-lying residential blocks and threatening access to the north evacuation route.",
   "affectedFacilityIds": ["FAC-2"],
-  "assignedResourceIds": ["RES-1"]
+  "assignedResourceIds": ["RES-1"],
+  "source": "demo",
+  "sourceId": "INC-2048",
+  "sourceUrl": null,
+  "sourceUpdatedAt": "2026-08-17T14:18:00Z",
+  "ingestedAt": "2026-08-17T14:18:00Z"
+}
+```
+
+NWS-imported incidents use the same model. They may have `coordinates: null` because the current frontend map uses schematic regional x/y points, not real geospatial geometry.
+
+```json
+{
+  "id": "NWS-673F0EA0A9E18E51",
+  "title": "Severe Thunderstorm Warning for Camden County",
+  "kind": "weather",
+  "severity": "high",
+  "location": "Camden County",
+  "status": "monitoring",
+  "reportedAt": "2026-08-17T15:00:00Z",
+  "coordinates": null,
+  "description": "National Weather Service alert text and operator instructions.",
+  "affectedFacilityIds": [],
+  "assignedResourceIds": [],
+  "source": "nws",
+  "sourceId": "https://api.weather.gov/alerts/urn:oid:example",
+  "sourceUrl": "https://api.weather.gov/alerts/urn:oid:example",
+  "sourceUpdatedAt": "2026-08-17T14:50:00Z",
+  "ingestedAt": "2026-08-17T15:02:14Z"
 }
 ```
 
@@ -334,6 +553,41 @@ Likely status codes:
   "available": 13,
   "total": 20,
   "unit": "teams"
+}
+```
+
+### DisasterDeclaration
+
+```json
+{
+  "id": "FEMA-4926",
+  "disasterNumber": 4926,
+  "declarationType": "DR",
+  "state": "NJ",
+  "title": "Severe Storms and Flooding",
+  "incidentType": "Flood",
+  "declarationDate": "2026-08-03T00:00:00Z",
+  "incidentBeginDate": "2026-07-28",
+  "incidentEndDate": "2026-08-02",
+  "declaredAreas": ["Burlington County", "Camden County"],
+  "individualAssistanceDeclared": true,
+  "publicAssistanceDeclared": true,
+  "hazardMitigationDeclared": false,
+  "source": "fema",
+  "sourceId": "4926",
+  "sourceUpdatedAt": "2026-08-03T00:00:00Z",
+  "ingestedAt": "2026-08-18T14:00:02Z"
+}
+```
+
+### IncidentDeclarationLink
+
+```json
+{
+  "incidentId": "NWS-673F0EA0A9E18E51",
+  "declarationId": "FEMA-4926",
+  "confidence": 0.95,
+  "reasons": ["same_state", "compatible_hazard", "overlapping_time_window"]
 }
 ```
 
@@ -385,7 +639,12 @@ Likely status codes:
       "coordinates": { "x": 31, "y": 30 },
       "description": "Rapid river rise is flooding low-lying residential blocks and threatening access to the north evacuation route.",
       "affectedFacilityIds": ["FAC-2"],
-      "assignedResourceIds": ["RES-1"]
+      "assignedResourceIds": ["RES-1"],
+      "source": "demo",
+      "sourceId": "INC-2048",
+      "sourceUrl": null,
+      "sourceUpdatedAt": "2026-08-17T14:18:00Z",
+      "ingestedAt": "2026-08-17T14:18:00Z"
     }
   ],
   "resources": [
@@ -433,6 +692,7 @@ Types that can map directly to API responses:
 - `Recommendation`
 - `DashboardData`
 - String union types for `Severity`, `IncidentKind`, `IncidentStatus`, `RecommendationStatus`, `ResourceKind`, and `FacilityKind`
+- `IncidentSource`
 
 Types that should remain frontend-only:
 - `IncidentFilters`
@@ -440,9 +700,59 @@ Types that should remain frontend-only:
 Recommended future type changes:
 - Split API response DTOs from UI/domain view models once the Java API is implemented. For now, direct mapping is acceptable because the UI is small.
 - Keep API `IncidentStatus` values as stable enum-style strings such as `escalating`, `response_active`, `monitoring`, and `contained`; map them to UI display labels in the frontend API data-source layer.
+- Keep `source`, `sourceId`, `sourceUrl`, `sourceUpdatedAt`, and `ingestedAt` on the generic `Incident` model. Do not add source-specific fields such as `nwsHeadline` to the core model.
 - Consider changing facility status from inline string literals to a named `FacilityStatus` type.
 - Consider replacing map placeholder `Coordinates` with a named `MapPoint` or `RegionCoordinates` type while this remains an offline schematic map. Do not use latitude/longitude names until the product actually integrates a real map service.
+- Allow `Incident.coordinates` to be `null` because imported external incidents may not have schematic map placement.
 - Keep `affectedFacilityIds` and `assignedResourceIds` as id arrays for now. They make the aggregate dashboard compact and avoid duplicating facility/resource objects inside each incident.
+
+## NWS Import Contract
+
+NWS ingestion is intentionally not part of the frontend `OperationsDataSource` yet. It is a backend development/admin capability.
+
+Configuration:
+- `aegis.ingestion.nws.areas=NJ,NY,PA`
+- `AEGIS_NWS_AREAS=NJ,NY,PA` overrides the configured area list
+- `AEGIS_NWS_USER_AGENT` overrides the configured User-Agent
+- `aegis.ingestion.nws.enabled=true` performs a one-shot refresh after backend startup
+- `aegis.ingestion.nws.scheduled-enabled=true` enables scheduled refreshes
+- `aegis.ingestion.nws.refresh-interval=5m` controls the schedule and is clamped to a minimum of 30 seconds
+
+Normalization rules:
+- NWS `Extreme` severity maps to Aegis `critical`
+- NWS `Severe` maps to `high`
+- NWS `Moderate` maps to `moderate`
+- NWS `Minor`, unknown, or missing severity maps to `low`
+- `Flash Flood Warning`, `Flood Warning`, and `Flood Advisory` map to `flood`
+- Other NWS alerts map to `weather`
+- Imported NWS incidents default to `monitoring`
+- Internal IDs are deterministic `NWS-...` IDs derived from the external NWS alert ID; the full original ID is preserved in `sourceId`
+
+## FEMA Import And Correlation Contract
+
+Configuration:
+- `aegis.ingestion.fema.base-url=https://www.fema.gov/api/open/v1`
+- `aegis.ingestion.fema.states=NJ,NY,PA`
+- `AEGIS_FEMA_STATES=NJ,NY,PA` overrides the configured state list
+- `aegis.ingestion.fema.recent-window=730d` limits the query window
+
+Grouping and deduplication:
+- FEMA records are grouped by `disasterNumber`
+- one Aegis ID is created per disaster number, for example `FEMA-4926`
+- `designatedArea` values become `declaredAreas`
+- repeated ingestion updates the same declaration instead of duplicating it
+
+Correlation scoring:
+- same state: `+0.40`
+- compatible hazard: `+0.35`
+- incident timestamp within or near FEMA incident period: `+0.20`
+- declared-area text appears in incident location: `+0.05`
+- minimum exposed confidence: `0.70`
+
+Limitations:
+- Links are plausible operational relationships, not definitive legal or scientific matches.
+- Rules are deterministic and explainable. No LLM or ML model is used.
+- This design can later move to Spark by running the same source-specific normalization and link-scoring logic over larger historical or streaming datasets.
 
 ## Future ApiOperationsDataSource Shape
 

@@ -2,17 +2,24 @@ package com.aegis.operations.store.elasticsearch;
 
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import com.aegis.operations.model.DashboardData;
+import com.aegis.operations.model.DisasterDeclaration;
 import com.aegis.operations.model.Facility;
 import com.aegis.operations.model.Incident;
+import com.aegis.operations.model.IncidentDeclarationLink;
+import com.aegis.operations.model.IncidentSource;
 import com.aegis.operations.model.Recommendation;
 import com.aegis.operations.model.Resource;
+import com.aegis.operations.store.DeclarationSearchCriteria;
 import com.aegis.operations.store.DemoOperationsData;
 import com.aegis.operations.store.IncidentSearchCriteria;
 import com.aegis.operations.store.OperationsStore;
 import com.aegis.operations.store.elasticsearch.document.DashboardStateDocument;
+import com.aegis.operations.store.elasticsearch.document.DisasterDeclarationDocument;
 import com.aegis.operations.store.elasticsearch.document.IncidentDocument;
 import com.aegis.operations.store.elasticsearch.repository.DashboardStateRepository;
+import com.aegis.operations.store.elasticsearch.repository.DisasterDeclarationSearchRepository;
 import com.aegis.operations.store.elasticsearch.repository.FacilitySearchRepository;
+import com.aegis.operations.store.elasticsearch.repository.IncidentDeclarationLinkRepository;
 import com.aegis.operations.store.elasticsearch.repository.IncidentSearchRepository;
 import com.aegis.operations.store.elasticsearch.repository.RecommendationSearchRepository;
 import com.aegis.operations.store.elasticsearch.repository.ResourceSearchRepository;
@@ -37,6 +44,8 @@ public class ElasticsearchOperationsStore implements OperationsStore, Applicatio
     private final ResourceSearchRepository resourceRepository;
     private final FacilitySearchRepository facilityRepository;
     private final RecommendationSearchRepository recommendationRepository;
+    private final DisasterDeclarationSearchRepository declarationRepository;
+    private final IncidentDeclarationLinkRepository linkRepository;
     private final DashboardStateRepository stateRepository;
     private final ElasticsearchOperations elasticsearchOperations;
 
@@ -45,12 +54,16 @@ public class ElasticsearchOperationsStore implements OperationsStore, Applicatio
             ResourceSearchRepository resourceRepository,
             FacilitySearchRepository facilityRepository,
             RecommendationSearchRepository recommendationRepository,
+            DisasterDeclarationSearchRepository declarationRepository,
+            IncidentDeclarationLinkRepository linkRepository,
             DashboardStateRepository stateRepository,
             ElasticsearchOperations elasticsearchOperations) {
         this.incidentRepository = incidentRepository;
         this.resourceRepository = resourceRepository;
         this.facilityRepository = facilityRepository;
         this.recommendationRepository = recommendationRepository;
+        this.declarationRepository = declarationRepository;
+        this.linkRepository = linkRepository;
         this.stateRepository = stateRepository;
         this.elasticsearchOperations = elasticsearchOperations;
     }
@@ -58,11 +71,12 @@ public class ElasticsearchOperationsStore implements OperationsStore, Applicatio
     @Override
     public void run(ApplicationArguments args) {
         seedIfEmpty();
+        backfillMissingIncidentSources();
     }
 
     @Override
     public DashboardData dashboardSnapshot() {
-        return new DashboardData(lastUpdated(), searchIncidents(new IncidentSearchCriteria(null, null, null, null)),
+        return new DashboardData(lastUpdated(), searchIncidents(new IncidentSearchCriteria(null, null, null, null, null)),
                 resourceSnapshots(), facilitySnapshots(), recommendationSnapshots());
     }
 
@@ -80,8 +94,27 @@ public class ElasticsearchOperationsStore implements OperationsStore, Applicatio
     }
 
     @Override
+    public List<DisasterDeclaration> searchDeclarations(DeclarationSearchCriteria criteria) {
+        NativeQuery query = NativeQuery.builder()
+                .withQuery(buildDeclarationQuery(criteria))
+                .build();
+
+        return elasticsearchOperations.search(query, DisasterDeclarationDocument.class).stream()
+                .map(SearchHit::getContent)
+                .map(ElasticsearchDocumentMapper::toDomain)
+                .sorted(Comparator.comparing(DisasterDeclaration::getDeclarationDate,
+                        Comparator.nullsLast(Comparator.naturalOrder())).reversed())
+                .toList();
+    }
+
+    @Override
     public Optional<Incident> incidentSnapshot(String incidentId) {
         return incidentRepository.findById(incidentId).map(ElasticsearchDocumentMapper::toDomain);
+    }
+
+    @Override
+    public Optional<DisasterDeclaration> declarationSnapshot(String declarationId) {
+        return declarationRepository.findById(declarationId).map(ElasticsearchDocumentMapper::toDomain);
     }
 
     @Override
@@ -116,8 +149,39 @@ public class ElasticsearchOperationsStore implements OperationsStore, Applicatio
     }
 
     @Override
+    public List<Incident> incidentSnapshotsBySource(IncidentSource source) {
+        return searchIncidents(new IncidentSearchCriteria(null, null, null, null, source));
+    }
+
+    @Override
+    public List<IncidentDeclarationLink> linksForIncident(String incidentId) {
+        return linkRepository.findByIncidentId(incidentId).stream()
+                .map(ElasticsearchDocumentMapper::toDomain)
+                .sorted(Comparator.comparing(IncidentDeclarationLink::getConfidence).reversed())
+                .toList();
+    }
+
+    @Override
+    public List<IncidentDeclarationLink> linksForDeclaration(String declarationId) {
+        return linkRepository.findByDeclarationId(declarationId).stream()
+                .map(ElasticsearchDocumentMapper::toDomain)
+                .sorted(Comparator.comparing(IncidentDeclarationLink::getConfidence).reversed())
+                .toList();
+    }
+
+    @Override
     public void saveIncident(Incident incident) {
         incidentRepository.save(ElasticsearchDocumentMapper.toDocument(incident));
+    }
+
+    @Override
+    public void saveDeclaration(DisasterDeclaration declaration) {
+        declarationRepository.save(ElasticsearchDocumentMapper.toDocument(declaration));
+    }
+
+    @Override
+    public void saveIncidentDeclarationLink(IncidentDeclarationLink link) {
+        linkRepository.save(ElasticsearchDocumentMapper.toDocument(link));
     }
 
     @Override
@@ -131,6 +195,22 @@ public class ElasticsearchOperationsStore implements OperationsStore, Applicatio
     }
 
     @Override
+    public void deleteIncident(String incidentId) {
+        incidentRepository.deleteById(incidentId);
+        deleteLinksForIncident(incidentId);
+    }
+
+    @Override
+    public void deleteLinksForIncident(String incidentId) {
+        linkRepository.deleteByIncidentId(incidentId);
+    }
+
+    @Override
+    public void deleteLinksForDeclaration(String declarationId) {
+        linkRepository.deleteByDeclarationId(declarationId);
+    }
+
+    @Override
     public void updateLastUpdated() {
         saveLastUpdated(Instant.now());
     }
@@ -141,6 +221,8 @@ public class ElasticsearchOperationsStore implements OperationsStore, Applicatio
         resourceRepository.deleteAll();
         facilityRepository.deleteAll();
         recommendationRepository.deleteAll();
+        declarationRepository.deleteAll();
+        linkRepository.deleteAll();
         stateRepository.deleteAll();
         seedDemoData();
     }
@@ -152,6 +234,21 @@ public class ElasticsearchOperationsStore implements OperationsStore, Applicatio
                 && recommendationRepository.count() == 0) {
             seedDemoData();
         }
+    }
+
+    private void backfillMissingIncidentSources() {
+        List<IncidentDocument> documentsMissingSource = toList(incidentRepository.findAll()).stream()
+                .filter(document -> !StringUtils.hasText(document.getSource()))
+                .toList();
+
+        if (documentsMissingSource.isEmpty()) {
+            return;
+        }
+
+        incidentRepository.saveAll(documentsMissingSource.stream()
+                .map(ElasticsearchDocumentMapper::toDomain)
+                .map(ElasticsearchDocumentMapper::toDocument)
+                .toList());
     }
 
     private void seedDemoData() {
@@ -201,6 +298,35 @@ public class ElasticsearchOperationsStore implements OperationsStore, Applicatio
         }
         if (criteria.status() != null) {
             filter.add(termQuery("status", criteria.status().jsonValue()));
+        }
+        if (criteria.source() != null) {
+            filter.add(termQuery("source", criteria.source().jsonValue()));
+        }
+
+        if (must.isEmpty() && filter.isEmpty()) {
+            return Query.of(query -> query.matchAll(matchAll -> matchAll));
+        }
+
+        return Query.of(query -> query.bool(bool -> bool.must(must).filter(filter)));
+    }
+
+    private Query buildDeclarationQuery(DeclarationSearchCriteria criteria) {
+        List<Query> must = new ArrayList<>();
+        List<Query> filter = new ArrayList<>();
+
+        if (StringUtils.hasText(criteria.search())) {
+            must.add(Query.of(query -> query.multiMatch(multiMatch -> multiMatch
+                    .query(criteria.search().trim())
+                    .fields("title", "declaredAreas"))));
+        }
+        if (StringUtils.hasText(criteria.state())) {
+            filter.add(termQuery("state", criteria.state().trim().toUpperCase()));
+        }
+        if (StringUtils.hasText(criteria.incidentType())) {
+            filter.add(termQuery("incidentType", criteria.incidentType().trim()));
+        }
+        if (StringUtils.hasText(criteria.declarationType())) {
+            filter.add(termQuery("declarationType", criteria.declarationType().trim()));
         }
 
         if (must.isEmpty() && filter.isEmpty()) {

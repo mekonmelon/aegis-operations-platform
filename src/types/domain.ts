@@ -1,6 +1,7 @@
 export type Severity = 'critical' | 'high' | 'moderate' | 'low'
 export type IncidentStatus = 'Escalating' | 'Response active' | 'Monitoring' | 'Contained'
-export type IncidentKind = 'flood' | 'wildfire' | 'outage' | 'road'
+export type IncidentKind = 'flood' | 'wildfire' | 'outage' | 'road' | 'weather'
+export type IncidentSource = 'demo' | 'nws'
 export type RecommendationStatus = 'pending' | 'approved' | 'dismissed'
 
 export interface Coordinates { x: number; y: number }
@@ -13,10 +14,15 @@ export interface Incident {
   location: string
   status: IncidentStatus
   reportedAt: string
-  coordinates: Coordinates
+  coordinates?: Coordinates | null
   description: string
   affectedFacilityIds: string[]
   assignedResourceIds: string[]
+  source: IncidentSource
+  sourceId?: string | null
+  sourceUrl?: string | null
+  sourceUpdatedAt?: string | null
+  ingestedAt?: string | null
 }
 
 export type ResourceKind = 'teams' | 'vehicles' | 'medical' | 'supplies'
@@ -38,6 +44,33 @@ export interface Recommendation {
 }
 
 export interface DashboardData { incidents: Incident[]; resources: Resource[]; facilities: Facility[]; recommendations: Recommendation[]; lastUpdated: string }
+
+export interface DisasterDeclaration {
+  id: string
+  disasterNumber: number
+  declarationType: string
+  state: string
+  title: string
+  incidentType: string
+  declarationDate: string
+  incidentBeginDate?: string | null
+  incidentEndDate?: string | null
+  declaredAreas: string[]
+  individualAssistanceDeclared: boolean
+  publicAssistanceDeclared: boolean
+  hazardMitigationDeclared: boolean
+  source: 'fema'
+  sourceId: string
+  sourceUpdatedAt?: string | null
+  ingestedAt?: string | null
+}
+
+export interface IncidentDeclarationMatch {
+  incidentId: string
+  declaration: DisasterDeclaration
+  confidence: number
+  reasons: string[]
+}
 
 export interface IncidentFilters {
   search: string

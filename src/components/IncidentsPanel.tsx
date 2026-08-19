@@ -1,9 +1,9 @@
-import { Flame, Waves, Zap, TrafficCone, ChevronRight } from 'lucide-react'
+import { CloudSun, Flame, Waves, Zap, TrafficCone, ChevronRight } from 'lucide-react'
 import type { Incident, IncidentFilters, IncidentKind, IncidentStatus, Severity } from '../types/domain'
 
-const icons = { flood: Waves, wildfire: Flame, outage: Zap, road: TrafficCone } satisfies Record<IncidentKind, typeof Waves>
+const icons = { flood: Waves, wildfire: Flame, outage: Zap, road: TrafficCone, weather: CloudSun } satisfies Record<IncidentKind, typeof Waves>
 const severities: Array<Severity | 'all'> = ['all', 'critical', 'high', 'moderate', 'low']
-const kinds: Array<IncidentKind | 'all'> = ['all', 'flood', 'wildfire', 'outage', 'road']
+const kinds: Array<IncidentKind | 'all'> = ['all', 'flood', 'wildfire', 'outage', 'road', 'weather']
 const statuses: Array<IncidentStatus | 'all'> = ['all', 'Escalating', 'Response active', 'Monitoring', 'Contained']
 
 interface IncidentsPanelProps {
@@ -30,6 +30,6 @@ export function IncidentsPanel({ incidents, totalIncidents, filters, selectedInc
       </div>
       <p>{incidents.length} of {totalIncidents} incidents shown</p>
     </div>
-    <div className="incident-list">{incidents.length > 0 ? incidents.map(item => { const Icon = icons[item.kind]; const isSelected = item.id === selectedIncidentId; return <button type="button" className={`incident ${isSelected ? 'selected' : ''}`} key={item.id} onClick={() => onSelectIncident(item.id)} aria-pressed={isSelected}><span className={`incident-icon ${item.severity}`}><Icon size={18}/></span><span className="incident-main"><span className="incident-title"><h3>{item.title}</h3><span className={`severity ${item.severity}`}>{item.severity}</span></span><span className="incident-location">{item.location}</span><span className="incident-meta"><span>{item.status}</span><time>{new Intl.DateTimeFormat('en', { hour: 'numeric', minute: '2-digit' }).format(new Date(item.reportedAt))}</time><b>{item.id}</b></span></span></button> }) : <div className="empty-state">No incidents match the current filters.</div>}</div>
+    <div className="incident-list">{incidents.length > 0 ? incidents.map(item => { const Icon = icons[item.kind]; const isSelected = item.id === selectedIncidentId; return <button type="button" className={`incident ${isSelected ? 'selected' : ''}`} key={item.id} onClick={() => onSelectIncident(item.id)} aria-pressed={isSelected}><span className={`incident-icon ${item.severity}`}><Icon size={18}/></span><span className="incident-main"><span className="incident-title"><h3>{item.title}</h3><span className={`severity ${item.severity}`}>{item.severity}</span></span><span className="incident-location">{item.location}</span><span className="incident-meta"><span>{item.status}</span><time>{new Intl.DateTimeFormat('en', { hour: 'numeric', minute: '2-digit' }).format(new Date(item.reportedAt))}</time><span className={`source-badge ${item.source}`}>{item.source.toUpperCase()}</span><b>{item.id}</b></span></span></button> }) : <div className="empty-state">No incidents match the current filters.</div>}</div>
   </section>
 }

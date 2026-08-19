@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Header } from './components/Header'
 import { IncidentDetails } from './components/IncidentDetails'
 import { IncidentsPanel } from './components/IncidentsPanel'
@@ -15,7 +15,7 @@ const initialFilters: IncidentFilters = { search: '', severity: 'all', kind: 'al
 const dataSourceConfig = createOperationsDataSourceConfig()
 
 export default function App() {
-  const { data, error, actionPending, sourceStatus, sourceMessage, approveRecommendation, dismissRecommendation } = useOperationsData(dataSourceConfig)
+  const { data, error, actionPending, sourceStatus, sourceMessage, relatedDeclarations, approveRecommendation, dismissRecommendation, loadRelatedDeclarations } = useOperationsData(dataSourceConfig)
   const [userSelectedIncidentId, setUserSelectedIncidentId] = useState<string | null>(null)
   const [filters, setFilters] = useState<IncidentFilters>(initialFilters)
 
@@ -36,12 +36,16 @@ export default function App() {
     })
   }, [data, filters])
 
+  const defaultIncidentId = data?.incidents.find(incident => incident.severity === 'critical')?.id ?? data?.incidents[0]?.id ?? null
+  const selectedIncidentId = userSelectedIncidentId ?? defaultIncidentId
+  const selectedIncident = data?.incidents.find(incident => incident.id === selectedIncidentId) ?? null
+
+  useEffect(() => {
+    loadRelatedDeclarations(selectedIncidentId)
+  }, [loadRelatedDeclarations, selectedIncidentId])
+
   if (error) return <main className="state">{error}</main>
   if (!data) return <main className="state">Loading operations center…</main>
 
-  const defaultIncidentId = data.incidents.find(incident => incident.severity === 'critical')?.id ?? data.incidents[0]?.id ?? null
-  const selectedIncidentId = userSelectedIncidentId ?? defaultIncidentId
-  const selectedIncident = data.incidents.find(incident => incident.id === selectedIncidentId) ?? null
-
-  return <><Header updatedAt={data.lastUpdated} sourceStatus={sourceStatus}/><main>{sourceMessage && <div className="source-alert">{sourceMessage}</div>}<div className="page-title"><div><span>OPERATIONS CENTER</span><h2>Regional Situational Overview</h2></div><p>Monday, August 17, 2026 <i/> Operational Period 04</p></div><MetricCards data={data}/><div className="dashboard-grid"><IncidentsPanel incidents={filteredIncidents} totalIncidents={data.incidents.length} filters={filters} selectedIncidentId={selectedIncidentId} onFiltersChange={setFilters} onSelectIncident={setUserSelectedIncidentId}/><OperationsMap incidents={data.incidents} facilities={data.facilities} selectedIncidentId={selectedIncidentId} onSelectIncident={setUserSelectedIncidentId}/><ResourceStatus resources={data.resources}/><IncidentDetails incident={selectedIncident} facilities={data.facilities} resources={data.resources}/><RecommendedAction recommendation={data.recommendations[0]} busy={actionPending === data.recommendations[0]?.id} onApprove={approveRecommendation} onDismiss={dismissRecommendation}/></div></main><footer><span>AEGIS OPERATIONS NETWORK</span><span>Secure session · Classification: INTERNAL</span></footer></>
+  return <><Header updatedAt={data.lastUpdated} sourceStatus={sourceStatus}/><main>{sourceMessage && <div className="source-alert">{sourceMessage}</div>}<div className="page-title"><div><span>OPERATIONS CENTER</span><h2>Regional Situational Overview</h2></div><p>Monday, August 17, 2026 <i/> Operational Period 04</p></div><MetricCards data={data}/><div className="dashboard-grid"><IncidentsPanel incidents={filteredIncidents} totalIncidents={data.incidents.length} filters={filters} selectedIncidentId={selectedIncidentId} onFiltersChange={setFilters} onSelectIncident={setUserSelectedIncidentId}/><OperationsMap incidents={data.incidents} facilities={data.facilities} selectedIncidentId={selectedIncidentId} onSelectIncident={setUserSelectedIncidentId}/><ResourceStatus resources={data.resources}/><IncidentDetails incident={selectedIncident} facilities={data.facilities} resources={data.resources} relatedDeclarations={relatedDeclarations}/><RecommendedAction recommendation={data.recommendations[0]} busy={actionPending === data.recommendations[0]?.id} onApprove={approveRecommendation} onDismiss={dismissRecommendation}/></div></main><footer><span>AEGIS OPERATIONS NETWORK</span><span>Secure session · Classification: INTERNAL</span></footer></>
 }

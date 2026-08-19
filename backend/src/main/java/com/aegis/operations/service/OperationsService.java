@@ -7,6 +7,7 @@ import com.aegis.operations.model.DashboardData;
 import com.aegis.operations.model.Facility;
 import com.aegis.operations.model.Incident;
 import com.aegis.operations.model.IncidentKind;
+import com.aegis.operations.model.IncidentSource;
 import com.aegis.operations.model.IncidentStatus;
 import com.aegis.operations.model.Recommendation;
 import com.aegis.operations.model.RecommendationStatus;
@@ -30,12 +31,14 @@ public class OperationsService {
         return store.dashboardSnapshot();
     }
 
-    public List<Incident> listIncidents(String search, String severity, String kind, String status) {
+    public List<Incident> listIncidents(String search, String severity, String kind, String status, String source) {
         Severity severityFilter = parseOptional(Severity.class, severity, "severity");
         IncidentKind kindFilter = parseOptional(IncidentKind.class, kind, "kind");
         IncidentStatus statusFilter = parseOptional(IncidentStatus.class, status, "status");
+        IncidentSource sourceFilter = parseOptional(IncidentSource.class, source, "source");
 
-        return store.searchIncidents(new IncidentSearchCriteria(search, severityFilter, kindFilter, statusFilter));
+        return store.searchIncidents(new IncidentSearchCriteria(search, severityFilter, kindFilter, statusFilter,
+                sourceFilter));
     }
 
     public Incident getIncident(String incidentId) {

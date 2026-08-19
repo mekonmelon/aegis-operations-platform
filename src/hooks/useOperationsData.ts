@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import type { DashboardData } from '../types/domain'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { DashboardData, IncidentDeclarationMatch } from '../types/domain'
 import type { DataSourceStatus, OperationsDataSource, OperationsDataSourceConfig } from '../services/dataSource'
 
 export function useOperationsData(dataSourceConfig: OperationsDataSourceConfig) {
@@ -8,6 +8,7 @@ export function useOperationsData(dataSourceConfig: OperationsDataSourceConfig) 
   const [actionPending, setActionPending] = useState<string | null>(null)
   const [sourceStatus, setSourceStatus] = useState<DataSourceStatus>(dataSourceConfig.requestedMode === 'api' ? 'api' : 'mock')
   const [sourceMessage, setSourceMessage] = useState<string | null>(null)
+  const [relatedDeclarations, setRelatedDeclarations] = useState<IncidentDeclarationMatch[]>([])
   const activeDataSource = useRef<OperationsDataSource>(dataSourceConfig.primary)
 
   useEffect(() => {
@@ -80,7 +81,20 @@ export function useOperationsData(dataSourceConfig: OperationsDataSourceConfig) 
     }
   }
 
-  return { data, error, actionPending, sourceStatus, sourceMessage, approveRecommendation, dismissRecommendation }
+  const loadRelatedDeclarations = useCallback(async (incidentId: string | null) => {
+    if (!incidentId) {
+      setRelatedDeclarations([])
+      return
+    }
+
+    try {
+      setRelatedDeclarations(await activeDataSource.current.getRelatedDeclarations(incidentId))
+    } catch {
+      setRelatedDeclarations([])
+    }
+  }, [])
+
+  return { data, error, actionPending, sourceStatus, sourceMessage, relatedDeclarations, approveRecommendation, dismissRecommendation, loadRelatedDeclarations }
 }
 
 function errorMessage(error: unknown, fallback: string) {
